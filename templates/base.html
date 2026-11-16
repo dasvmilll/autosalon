@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AutoDrive{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="{% url 'core:home' %}" class="logo">AutoDrive</a>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="{% url 'core:home' %}">Главная</a></li>
+                    <li><a href="#">Каталог</a></li>
+                    <li><a href="#">Тест-драйв</a></li>
+                    <li><a href="#">Трейд-ин</a></li>
+                </ul>
+            </nav>
+            <button class="btn-login">Войти</button>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main class="site-main">
+        <div class="container">
+            {% block content %}
+            {% endblock %}
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="site-footer">
+        <div class="container footer-grid">
+            <div class="footer-col">
+                <a href="{% url 'core:home' %}" class="footer-logo">AutoDrive</a>
+                <p class="footer-text">Ваш надежный партнер в мире автомобилей. Помогаем выбрать, протестировать и выгодно купить машину мечты.</p>
+            </div>
+            <div class="footer-col">
+                <h3 class="footer-title">Каталог</h3>
+                <ul class="footer-links">
+                    <li><a href="#">Новые автомобили</a></li>
+                    <li><a href="#">Автомобили в наличии</a></li>
+                    <li><a href="#">Спецпредложения</a></li>
+                    <li><a href="#">Трейд-ин</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h3 class="footer-title">Помощь</h3>
+                <ul class="footer-links">
+                    <li><a href="#">Как записаться на тест-драйв</a></li>
+                    <li><a href="#">Условия бронирования</a></li>
+                    <li><a href="#">Вопросы и ответы</a></li>
+                    <li><a href="#">Политика конфиденциальности</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h3 class="footer-title">Контакты</h3>
+                <ul class="footer-contacts">
+                    <li>+7 (900) 000-00-00</li>
+                    <li>info@autodrive.ru</li>
+                    <li>г. Москва, ул. Автомобильная, д. 1</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <div class="container footer-bottom-inner">
+                <p>&copy; 2026 AutoDrive. Все права защищены.</p>
+                <div class="social-links">
+                    <a href="#" title="VK">VK</a>
+                    <a href="#" title="Telegram">TG</a>
+                    <a href="#" title="YouTube">YT</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
