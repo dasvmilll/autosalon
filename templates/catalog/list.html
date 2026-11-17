@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}Каталог — AutoDrive{% endblock %}
+
+{% block content %}
+    <h1>Каталог автомобилей</h1>
+    
+    <div class="filters-bar">
+        <form method="get" class="filters-form">
+            <input type="text" name="brand" placeholder="Марка (например, Haval)" value="{{ request.GET.brand }}">
+            <select name="sort">
+                <option value="">Сначала новые</option>
+                <option value="price_asc" {% if request.GET.sort == 'price_asc' %}selected{% endif %}>Цена: по возрастанию</option>
+                <option value="price_desc" {% if request.GET.sort == 'price_desc' %}selected{% endif %}>Цена: по убыванию</option>
+            </select>
+            <button type="submit" class="btn-primary">Применить</button>
+        </form>
+    </div>
+
+    <div class="cards-grid">
+        {% for car in cars %}
+            <article class="card">
+                <div class="card-img">Фото</div>
+                <div class="card-body">
+                    <h3 class="card-title">{{ car.trim.car_model.brand }} {{ car.trim.car_model.name }}</h3>
+                    <p class="card-subtitle">{{ car.trim.name }} · {{ car.color }}</p>
+                    <p class="card-price">{{ car.actual_price|floatformat:0 }} ₽</p>
+                    <a href="{% url 'catalog:detail' car.pk %}" class="btn-secondary">Подробнее</a>
+                </div>
+            </article>
+        {% empty %}
+            <p>Ничего не найдено.</p>
+        {% endfor %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.brand %}&brand={{ request.GET.brand }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">← Назад</a>
+            {% endif %}
+            <span class="current-page">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if request.GET.brand %}&brand={{ request.GET.brand }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">Вперед →</a>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

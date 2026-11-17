@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Мой трейд-ин — AutoDrive{% endblock %}
+
+{% block content %}
+    <h1>Мои заявки на трейд-ин</h1>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr><th>Автомобиль</th><th>Год</th><th>Статус</th></tr>
+            </thead>
+            <tbody>
+                {% for r in requests %}
+                    <tr>
+                        <td>{{ r.brand }} {{ r.model_name }}</td>
+                        <td>{{ r.year }}</td>
+                        <td>{{ r.get_status_display }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="3">Заявок нет.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

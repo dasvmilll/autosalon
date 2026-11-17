@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Тест-драйв — AutoDrive{% endblock %}
+
+{% block content %}
+    <h1>Свободные слоты на тест-драйв</h1>
+    <div class="cards-grid">
+        {% for slot in slots %}
+            <article class="card">
+                <div class="card-body">
+                    <div class="slot-header">
+                        <h3>{{ slot.test_car.internal_number }}</h3>
+                        <span class="slot-date">{{ slot.start_time|date:"d.m.Y" }}</span>
+                    </div>
+                    <p class="slot-time">{{ slot.start_time|date:"H:i" }} — {{ slot.end_time|date:"H:i" }}</p>
+                    <p class="slot-manager">Менеджер: {{ slot.manager.username }}</p>
+                    <a href="#" class="btn-book">Записаться →</a>
+                </div>
+            </article>
+        {% empty %}
+            <p>Свободных слотов пока нет.</p>
+        {% endfor %}
+    </div>
+{% endblock %}

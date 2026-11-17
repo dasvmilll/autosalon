@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}{{ car.trim.car_model }} — AutoDrive{% endblock %}
+
+{% block content %}
+    <div class="car-detail">
+        <div class="car-photo">Фото</div>
+        <div class="car-info">
+            <h1>{{ car.trim.car_model.brand }} {{ car.trim.car_model.name }}</h1>
+            <p class="car-subtitle">{{ car.trim.name }} · {{ car.color }}</p>
+            <p class="car-price">{{ car.actual_price|floatformat:0 }} ₽</p>
+            <ul class="car-specs">
+                <li><strong>Двигатель:</strong> {{ car.trim.engine }} ({{ car.trim.power_hp }} л.с.)</li>
+                <li><strong>КПП:</strong> {{ car.trim.transmission }}</li>
+                <li><strong>Привод:</strong> {{ car.trim.drivetrain }}</li>
+                <li><strong>VIN:</strong> {{ car.vin }}</li>
+            </ul>
+            <a href="{% url 'testdrive:slots' %}" class="btn-primary">Записаться на тест-драйв</a>
+        </div>
+    </div>
+{% endblock %}
