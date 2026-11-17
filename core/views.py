@@ -1,4 +1,6 @@
 from django.shortcuts import render
+from catalog.models import CarInStock
 
 def home(request):
-    return render(request, 'core/home.html')
+    cars = CarInStock.objects.filter(status='available')[:3]
+    return render(request, 'core/home.html', {'cars': cars})

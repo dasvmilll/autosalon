@@ -4,5 +4,5 @@ from . import views
 app_name = 'booking'
 
 urlpatterns = [
-    # Маршруты для бронирования добавим на Занятии 8
+    path('my/', views.my_reservations, name='my_list'),
 ]

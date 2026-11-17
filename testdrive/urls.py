@@ -4,5 +4,6 @@ from . import views
 app_name = 'testdrive'
 
 urlpatterns = [
-    # Маршруты для тест-драйва добавим на Занятии 8
+    path('slots/', views.slot_list, name='slots'),
+    path('my/', views.my_bookings, name='my_list'),
 ]

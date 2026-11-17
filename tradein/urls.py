@@ -4,5 +4,5 @@ from . import views
 app_name = 'tradein'
 
 urlpatterns = [
-    # Маршруты для трейд-ина добавим на Занятии 8
+    path('my/', views.my_tradeins, name='my_list'),
 ]

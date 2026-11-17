@@ -10,7 +10,7 @@ urlpatterns = [
     path('testdrive/', include('testdrive.urls')), # Тест-драйв
     path('booking/', include('booking.urls')), # Брони
     path('tradein/', include('tradein.urls')), # Трейд-ин
-    # path('accounts/', include('accounts.urls')), # Пока можно закомментировать
+    path('accounts/', include('django.contrib.auth.urls')),
 ]
 
 if settings.DEBUG:
