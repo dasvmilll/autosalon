@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Запись на тест-драйв — AutoDrive{% endblock %}
+
+{% block content %}
+    <div class="form-card">
+        <h2>Запись на тест-драйв</h2>
+        <p class="form-hint">Автомобиль: {{ slot.test_car.internal_number }} ({{ slot.start_time|date:"d.m.Y H:i" }})</p>
+        <form method="post" novalidate id="testdriveForm">
+            {% csrf_token %}
+            {{ form.slot.as_hidden }}
+            <div class="form-group">
+                <label>Номер водительского удостоверения</label>
+                {{ form.license_number }}
+                {% if form.license_number.errors %}
+                    <div class="errorlist">{{ form.license_number.errors }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label>Стаж вождения (лет)</label>
+                {{ form.experience_years }}
+                {% if form.experience_years.errors %}
+                    <div class="errorlist">{{ form.experience_years.errors }}</div>
+                {% endif %}
+                <div class="form-hint">Минимум 2 года</div>
+            </div>
+            <button type="submit" class="btn-primary btn-full">Записаться</button>
+        </form>
+    </div>
+{% endblock %}
