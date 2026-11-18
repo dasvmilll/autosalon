@@ -1,25 +1,37 @@
 {% extends 'base.html' %}
+{% load custom_filters %}
+
 {% block title %}Каталог — AutoDrive{% endblock %}
 
 {% block content %}
+    <nav class="breadcrumbs">
+        <a href="{% url 'core:home' %}">Главная</a> / <span>Каталог</span>
+    </nav>
+    
     <h1>Каталог автомобилей</h1>
     
     <div class="filters-bar">
-        <form method="get" class="filters-form">
-            <input type="text" name="brand" placeholder="Марка (например, Haval)" value="{{ request.GET.brand }}">
-            <select name="sort">
+        <form id="filterForm" class="filters-form">
+            <input type="text" name="brand" id="filterBrand" placeholder="Марка (например, Haval)" value="{{ request.GET.brand }}">
+            <select name="sort" id="filterSort">
                 <option value="">Сначала новые</option>
                 <option value="price_asc" {% if request.GET.sort == 'price_asc' %}selected{% endif %}>Цена: по возрастанию</option>
                 <option value="price_desc" {% if request.GET.sort == 'price_desc' %}selected{% endif %}>Цена: по убыванию</option>
             </select>
-            <button type="submit" class="btn-primary">Применить</button>
         </form>
     </div>
 
-    <div class="cards-grid">
+    <div id="catalogLoader" class="catalog-loader">Загрузка автомобилей...</div>
+
+    <div class="cards-grid" id="carsGrid">
         {% for car in cars %}
             <article class="card">
-                <div class="card-img">Фото</div>
+                <div class="card-img">
+                    <img src="{{ car.trim.car_model|get_car_image }}" alt="{{ car.trim.car_model }}" width="400" height="200" loading="lazy">
+                    {% if car.status == 'reserved' %}
+                        <span class="status-badge reserved">Забронирован</span>
+                    {% endif %}
+                </div>
                 <div class="card-body">
                     <h3 class="card-title">{{ car.trim.car_model.brand }} {{ car.trim.car_model.name }}</h3>
                     <p class="card-subtitle">{{ car.trim.name }} · {{ car.color }}</p>
@@ -28,12 +40,14 @@
                 </div>
             </article>
         {% empty %}
-            <p>Ничего не найдено.</p>
+            <div class="empty-state">
+                <p>Ничего не найдено.</p>
+            </div>
         {% endfor %}
     </div>
 
     {% if page_obj.has_other_pages %}
-        <div class="pagination">
+        <div class="pagination" id="paginationBlock">
             {% if page_obj.has_previous %}
                 <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.brand %}&brand={{ request.GET.brand }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">← Назад</a>
             {% endif %}
