@@ -2,28 +2,67 @@
 {% block title %}Запись на тест-драйв — AutoDrive{% endblock %}
 
 {% block content %}
-    <div class="form-card">
+    <div class="form-card" style="max-width: 600px;">
+        <p class="breadcrumbs">
+            <a href="{% url 'core:home' %}">Главная</a> /
+            <a href="{% url 'testdrive:slots' %}">Слоты</a> /
+            Запись
+        </p>
+
         <h2>Запись на тест-драйв</h2>
-        <p class="form-hint">Автомобиль: {{ slot.test_car.internal_number }} ({{ slot.start_time|date:"d.m.Y H:i" }})</p>
-        <form method="post" novalidate id="testdriveForm">
+
+        <div style="background: #F1F5F9; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+            <p><strong>Автомобиль:</strong> {{ slot.test_car.internal_number }}</p>
+            <p><strong>Дата:</strong> {{ slot.start_time|date:"d.m.Y" }}</p>
+            <p><strong>Время:</strong> {{ slot.start_time|date:"H:i" }} — {{ slot.end_time|date:"H:i" }}</p>
+            <p><strong>Менеджер:</strong> {{ slot.manager.username }}</p>
+        </div>
+
+        <form method="post" id="testdriveForm" novalidate>
             {% csrf_token %}
             {{ form.slot.as_hidden }}
+
+            {# ИСПРАВЛЕНИЕ ДЕФЕКТА 4: выводим общие ошибки формы #}
+            {# Раньше ошибки из clean() модели (проверка пересечений) не показывались #}
+            {% if form.non_field_errors %}
+                <div class="alert alert-error">
+                    {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
             <div class="form-group">
-                <label>Номер водительского удостоверения</label>
+                <label for="id_license_number">Номер водительского удостоверения</label>
                 {{ form.license_number }}
+                <small class="form-hint">Формат: 77 12 345678 (2 цифры, пробел, 2 цифры, пробел, 6 цифр)</small>
                 {% if form.license_number.errors %}
-                    <div class="errorlist">{{ form.license_number.errors }}</div>
+                    <ul class="errorlist">
+                        {% for error in form.license_number.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
                 {% endif %}
             </div>
+
             <div class="form-group">
-                <label>Стаж вождения (лет)</label>
+                <label for="id_experience_years">Стаж вождения (лет)</label>
                 {{ form.experience_years }}
+                <small class="form-hint">Минимум 2 года</small>
                 {% if form.experience_years.errors %}
-                    <div class="errorlist">{{ form.experience_years.errors }}</div>
+                    <ul class="errorlist">
+                        {% for error in form.experience_years.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
                 {% endif %}
-                <div class="form-hint">Минимум 2 года</div>
             </div>
+
             <button type="submit" class="btn-primary btn-full">Записаться</button>
         </form>
+
+        <p style="text-align: center; margin-top: 20px;">
+            <a href="{% url 'testdrive:slots' %}">← Вернуться к слотам</a>
+        </p>
     </div>
 {% endblock %}
