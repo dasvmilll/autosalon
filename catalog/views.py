@@ -69,8 +69,7 @@ def car_detail(request, pk):
 
 def api_search(request):
     """Живой поиск в шапке сайта.
-    Возвращает МАССИВ объектов {id, brand, model, price} — 
-    именно такой формат ожидает validation.js.
+    ИСПРАВЛЕНИЕ BUG-14: добавлен поиск по VIN (требование FR-01).
     """
     query = request.GET.get('q', '').strip()
     logger.debug(f'api_search: запрос "{query}" от {request.META.get("REMOTE_ADDR")}')
@@ -78,15 +77,14 @@ def api_search(request):
     if len(query) < 2:
         return JsonResponse([], safe=False)
     
-    # ИСПРАВЛЕНИЕ: добавлен select_related
+    # ИСПРАВЛЕНИЕ BUG-14: добавлен поиск по VIN
     cars = CarInStock.objects.filter(
         Q(trim__car_model__brand__icontains=query) |
-        Q(trim__car_model__name__icontains=query),
+        Q(trim__car_model__name__icontains=query) |
+        Q(vin__icontains=query),  # ← ДОБАВЛЕНО
         status='available'
     ).select_related('trim__car_model')[:5]
     
-    # ИСПРАВЛЕНИЕ: возвращаем массив (не {'results': data}),
-    # и поля brand/model отдельно (а не объединённое name)
     data = [
         {
             'id': c.id,
@@ -102,15 +100,39 @@ def api_search(request):
 
 
 def api_filter_cars(request):
-    """Живой фильтр каталога."""
+    """Живой фильтр каталога.
+    ИСПРАВЛЕНИЕ BUG-09: добавлена обработка price_min, price_max и body.
+    """
     logger.debug(f'api_filter_cars: параметры фильтра {dict(request.GET)}')
     
     cars = CarInStock.objects.filter(status='available').select_related('trim__car_model')
     
+    # Фильтр по бренду
     brand_query = request.GET.get('brand', '')
     if brand_query:
         cars = cars.filter(trim__car_model__brand__icontains=brand_query)
     
+    # ИСПРАВЛЕНИЕ BUG-09: фильтр по кузову
+    body_query = request.GET.get('body', '')
+    if body_query:
+        cars = cars.filter(trim__car_model__body_type__icontains=body_query)
+    
+    # ИСПРАВЛЕНИЕ BUG-09: фильтр по цене (от/до)
+    price_min = request.GET.get('price_min', '')
+    if price_min:
+        try:
+            cars = cars.filter(actual_price__gte=float(price_min))
+        except (ValueError, TypeError):
+            logger.warning(f'api_filter_cars: некорректное значение price_min="{price_min}"')
+    
+    price_max = request.GET.get('price_max', '')
+    if price_max:
+        try:
+            cars = cars.filter(actual_price__lte=float(price_max))
+        except (ValueError, TypeError):
+            logger.warning(f'api_filter_cars: некорректное значение price_max="{price_max}"')
+    
+    # Сортировка
     sort = request.GET.get('sort', '')
     if sort == 'price_asc':
         cars = cars.order_by('actual_price')
