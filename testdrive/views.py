@@ -13,11 +13,18 @@ logger = logging.getLogger(__name__)
 
 
 def slot_list(request):
-    """Список свободных слотов."""
+    """Список свободных слотов.
+    ИСПРАВЛЕНИЕ BUG-10: исключены слоты с активными записями.
+    """
+    # ИСПРАВЛЕНИЕ BUG-10: исключаем слоты, на которые уже есть активная запись
     slots = TestDriveSlot.objects.filter(
         is_blocked=False,
         start_time__gte=timezone.now()
-    ).order_by('start_time')
+    ).exclude(
+        booking__status__in=['created', 'confirmed']  # ← ДОБАВЛЕНО
+    ).order_by('start_time').select_related('test_car', 'manager')
+    
+    logger.info(f'slot_list: найдено {slots.count()} свободных слотов')
     return render(request, 'testdrive/slots.html', {'slots': slots})
 
 
@@ -43,16 +50,18 @@ def book_slot(request, pk):
     """Запись на тест-драйв."""
     slot = get_object_or_404(TestDriveSlot, pk=pk)
     logger.info(f'book_slot: пользователь {request.user.username} открыл форму записи на слот #{pk}')
-    
+
     if request.method == 'POST':
         form = TestDriveBookingForm(request.POST)
         if form.is_valid():
             booking = form.save(commit=False)
             booking.customer = request.user
             booking.slot = slot
+            # ВАЖНО: вызываем full_clean() для проверки модели (пересечения слотов)
             try:
                 booking.full_clean()
             except ValidationError as e:
+                # Переносим ошибки модели в форму
                 for field, errors in e.message_dict.items():
                     for error in errors:
                         form.add_error(field if field != '__all__' else None, error)
@@ -66,10 +75,13 @@ def book_slot(request, pk):
                 )
                 messages.success(request, 'Вы успешно записались на тест-драйв!')
                 return redirect('testdrive:my_list')
+        
+        if form.errors:
+            messages.error(request, 'Пожалуйста, исправьте ошибки в форме.')
     else:
         form = TestDriveBookingForm(initial={'slot': slot})
         form.fields['slot'].queryset = TestDriveSlot.objects.filter(pk=slot.pk)
-    
+
     return render(request, 'testdrive/book.html', {'form': form, 'slot': slot})
 
 
@@ -78,7 +90,7 @@ def book_slot(request, pk):
 def booking_cancel(request, pk):
     """FR-07: Отмена записи покупателем."""
     booking = get_object_or_404(TestDriveBooking, pk=pk, customer=request.user)
-    
+
     if booking.status != 'created':
         logger.warning(
             f'booking_cancel: {request.user.username} попытался отменить запись #{pk} '
@@ -89,7 +101,7 @@ def booking_cancel(request, pk):
             f'Нельзя отменить запись в статусе «{booking.get_status_display()}».'
         )
         return redirect('testdrive:my_list')
-    
+
     booking.status = 'cancelled'
     booking.save(update_fields=['status'])
     logger.info(
@@ -136,6 +148,5 @@ def manager_bookings(request):
     if request.user.role not in ['manager', 'admin']:
         messages.error(request, 'У вас нет прав.')
         return redirect('core:home')
-    # ИСПРАВЛЕНИЕ N+1: добавлен select_related
     bookings = TestDriveBooking.objects.all().select_related('slot__test_car', 'customer', 'slot__manager')
     return render(request, 'testdrive/manager_list.html', {'bookings': bookings})
