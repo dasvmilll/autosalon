@@ -1,19 +1,16 @@
-import logging
 from django.shortcuts import render, get_object_or_404
 from django.core.paginator import Paginator
+from .models import CarInStock
 from django.http import JsonResponse
 from django.db.models import Q
-from .models import CarInStock
+import logging
 
 logger = logging.getLogger(__name__)
 
 
 def catalog_list(request):
     """Список автомобилей с фильтрацией и сортировкой."""
-    # Журналирование открытия каталога
     logger.info(f'catalog_list: открытие каталога, параметры: {dict(request.GET)}')
-    
-    # ИСПРАВЛЕНИЕ N+1: select_related загружает trim и car_model одним JOIN-запросом
     cars = CarInStock.objects.filter(status='available').select_related('trim__car_model')
     
     brand_query = request.GET.get('brand')
@@ -24,9 +21,20 @@ def catalog_list(request):
     if body_query:
         cars = cars.filter(trim__car_model__body_type__icontains=body_query)
     
+    # ИСПРАВЛЕНИЕ BUG-13: защита от нечисловых значений цены
     price_max = request.GET.get('price_max')
     if price_max:
-        cars = cars.filter(actual_price__lte=price_max)
+        try:
+            cars = cars.filter(actual_price__lte=float(price_max))
+        except (ValueError, TypeError):
+            logger.warning(f'catalog_list: некорректное значение price_max="{price_max}"')
+    
+    price_min = request.GET.get('price_min')
+    if price_min:
+        try:
+            cars = cars.filter(actual_price__gte=float(price_min))
+        except (ValueError, TypeError):
+            logger.warning(f'catalog_list: некорректное значение price_min="{price_min}"')
     
     sort = request.GET.get('sort')
     if sort == 'price_asc':
@@ -46,10 +54,9 @@ def catalog_list(request):
     logger.info(f'catalog_list: найдено {paginator.count} машин, страница {page_obj.number}')
     return render(request, 'catalog/list.html', {'page_obj': page_obj, 'cars': page_obj.object_list})
 
-
 def car_detail(request, pk):
     """Детальная страница автомобиля."""
-    # ИСПРАВЛЕНИЕ N+1: добавлен select_related
+    # ИСПРАВЛЕНИЕ: добавлен select_related для загрузки связанных объектов одним JOIN-запросом
     # Раньше: 1 запрос на машину + 1 на trim + 1 на car_model = 3 запроса
     # Теперь: 1 запрос с JOIN
     car = get_object_or_404(
@@ -62,7 +69,7 @@ def car_detail(request, pk):
 
 def api_search(request):
     """Живой поиск в шапке сайта.
-    Возвращает массив объектов {id, brand, model, price} — 
+    Возвращает МАССИВ объектов {id, brand, model, price} — 
     именно такой формат ожидает validation.js.
     """
     query = request.GET.get('q', '').strip()
@@ -71,8 +78,7 @@ def api_search(request):
     if len(query) < 2:
         return JsonResponse([], safe=False)
     
-    # ИСПРАВЛЕНИЕ N+1: добавлен select_related
-    # Раньше в цикле for c in cars делались доп. запросы на trim и car_model
+    # ИСПРАВЛЕНИЕ: добавлен select_related
     cars = CarInStock.objects.filter(
         Q(trim__car_model__brand__icontains=query) |
         Q(trim__car_model__name__icontains=query),
@@ -80,8 +86,7 @@ def api_search(request):
     ).select_related('trim__car_model')[:5]
     
     # ИСПРАВЛЕНИЕ: возвращаем массив (не {'results': data}),
-    # и поля brand/model отдельно (а не объединённое name) — 
-    # именно такой формат ожидает validation.js
+    # и поля brand/model отдельно (а не объединённое name)
     data = [
         {
             'id': c.id,
@@ -100,7 +105,6 @@ def api_filter_cars(request):
     """Живой фильтр каталога."""
     logger.debug(f'api_filter_cars: параметры фильтра {dict(request.GET)}')
     
-    # ИСПРАВЛЕНИЕ N+1: select_related уже был — отлично
     cars = CarInStock.objects.filter(status='available').select_related('trim__car_model')
     
     brand_query = request.GET.get('brand', '')
@@ -117,7 +121,6 @@ def api_filter_cars(request):
     
     cars = cars[:20]
     
-    # Словарь картинок (должен совпадать с custom_filters.py)
     images = {
         'haval': '/media/cars/haval.jpg',
         'chery': '/media/cars/chery.jpg',
