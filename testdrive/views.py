@@ -47,43 +47,39 @@ def booking_detail(request, pk):
 
 @login_required
 def book_slot(request, pk):
-    """Запись на тест-драйв."""
+    """Запись на выбранный слот тест-драйва."""
     slot = get_object_or_404(TestDriveSlot, pk=pk)
-    logger.info(f'book_slot: пользователь {request.user.username} открыл форму записи на слот #{pk}')
+    
+    # Проверка: слот должен быть в будущем и не заблокирован
+    if slot.is_blocked or slot.start_time < timezone.now():
+        messages.error(request, 'Этот слот недоступен для записи.')
+        return redirect('testdrive:slots')
 
     if request.method == 'POST':
         form = TestDriveBookingForm(request.POST)
+        
+        # ИСПРАВЛЕНИЕ BUG-12: присваиваем значения экземпляру формы ДО вызова is_valid(), 
+        # чтобы метод clean() в models.py мог их безопасно прочитать и проверить пересечения
+        form.instance.customer = request.user
+        form.instance.slot = slot
+        
         if form.is_valid():
-            booking = form.save(commit=False)
-            booking.customer = request.user
-            booking.slot = slot
-            # ВАЖНО: вызываем full_clean() для проверки модели (пересечения слотов)
             try:
-                booking.full_clean()
-            except ValidationError as e:
-                # Переносим ошибки модели в форму
-                for field, errors in e.message_dict.items():
-                    for error in errors:
-                        form.add_error(field if field != '__all__' else None, error)
-                logger.warning(f'book_slot: ошибки модели при записи на слот #{pk}: {e}')
-            else:
-                booking.save()
-                logger.info(
-                    f'book_slot: УСПЕХ — {request.user.username} записался на тест-драйв '
-                    f'(слот #{pk}, авто {slot.test_car.internal_number}, '
-                    f'ВУ {booking.license_number}, стаж {booking.experience_years} лет)'
-                )
+                # Теперь form.save() сохранит всё корректно, включая связи, и пройдет валидацию модели
+                form.save()
+                
+                logger.info(f'УСПЕХ: пользователь {request.user.username} записался на слот #{slot.pk}')
                 messages.success(request, 'Вы успешно записались на тест-драйв!')
                 return redirect('testdrive:my_list')
-        
-        if form.errors:
-            messages.error(request, 'Пожалуйста, исправьте ошибки в форме.')
+            except Exception as e:
+                logger.error(f'ОШИБКА при записи на тест-драйв: {type(e).__name__}: {str(e)}', exc_info=True)
+                messages.error(request, 'Произошла ошибка при записи. Попробуйте выбрать другой слот.')
+        else:
+            logger.warning(f'Ошибки валидации формы записи: {form.errors}')
     else:
-        form = TestDriveBookingForm(initial={'slot': slot})
-        form.fields['slot'].queryset = TestDriveSlot.objects.filter(pk=slot.pk)
+        form = TestDriveBookingForm()
 
     return render(request, 'testdrive/book.html', {'form': form, 'slot': slot})
-
 
 @login_required
 @require_POST

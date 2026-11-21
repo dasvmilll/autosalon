@@ -5,56 +5,41 @@
     <div class="form-card" style="max-width: 600px;">
         <p class="breadcrumbs">
             <a href="{% url 'core:home' %}">Главная</a> /
-            <a href="{% url 'testdrive:slots' %}">Слоты</a> /
+            <a href="{% url 'testdrive:slots' %}">Тест-драйв</a> /
             Запись
         </p>
 
         <h2>Запись на тест-драйв</h2>
-
-        <div style="background: #F1F5F9; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-            <p><strong>Автомобиль:</strong> {{ slot.test_car.internal_number }}</p>
-            <p><strong>Дата:</strong> {{ slot.start_time|date:"d.m.Y" }}</p>
-            <p><strong>Время:</strong> {{ slot.start_time|date:"H:i" }} — {{ slot.end_time|date:"H:i" }}</p>
-            <p><strong>Менеджер:</strong> {{ slot.manager.username }}</p>
+        
+        <div class="info-box" style="margin-bottom: 20px;">
+            <strong>Автомобиль:</strong> {{ slot.test_car.internal_number }} ({{ slot.test_car.model_ref.brand }} {{ slot.test_car.model_ref.name }})<br>
+            <strong>Дата и время:</strong> {{ slot.start_time|date:"d.m.Y в H:i" }}<br>
+            <strong>Менеджер:</strong> {{ slot.manager.username }}
         </div>
 
-        <form method="post" id="testdriveForm" novalidate>
+        <form method="post" novalidate>
             {% csrf_token %}
-            {{ form.slot.as_hidden }}
-
-            {# ИСПРАВЛЕНИЕ ДЕФЕКТА 4: выводим общие ошибки формы #}
-            {# Раньше ошибки из clean() модели (проверка пересечений) не показывались #}
+            
+            {# ИСПРАВЛЕНИЕ BUG-12: Явный вывод общих ошибок формы (NON_FIELD_ERRORS) #}
             {% if form.non_field_errors %}
-                <div class="alert alert-error">
-                    {% for error in form.non_field_errors %}
-                        <p>{{ error }}</p>
-                    {% endfor %}
+                <div class="alert alert-error" style="margin-bottom: 20px; padding: 12px 16px; background: #FEE2E2; color: #991B1B; border-radius: 8px; border-left: 4px solid #EF4444;">
+                    {{ form.non_field_errors }}
                 </div>
             {% endif %}
 
             <div class="form-group">
-                <label for="id_license_number">Номер водительского удостоверения</label>
+                <label for="{{ form.license_number.id_for_label }}">Номер водительского удостоверения</label>
                 {{ form.license_number }}
-                <small class="form-hint">Формат: 77 12 345678 (2 цифры, пробел, 2 цифры, пробел, 6 цифр)</small>
                 {% if form.license_number.errors %}
-                    <ul class="errorlist">
-                        {% for error in form.license_number.errors %}
-                            <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
+                    <ul class="errorlist">{% for error in form.license_number.errors %}<li>{{ error }}</li>{% endfor %}</ul>
                 {% endif %}
             </div>
 
             <div class="form-group">
-                <label for="id_experience_years">Стаж вождения (лет)</label>
+                <label for="{{ form.experience_years.id_for_label }}">Стаж вождения (лет)</label>
                 {{ form.experience_years }}
-                <small class="form-hint">Минимум 2 года</small>
                 {% if form.experience_years.errors %}
-                    <ul class="errorlist">
-                        {% for error in form.experience_years.errors %}
-                            <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
+                    <ul class="errorlist">{% for error in form.experience_years.errors %}<li>{{ error }}</li>{% endfor %}</ul>
                 {% endif %}
             </div>
 
@@ -62,7 +47,7 @@
         </form>
 
         <p style="text-align: center; margin-top: 20px;">
-            <a href="{% url 'testdrive:slots' %}">← Вернуться к слотам</a>
+            <a href="{% url 'testdrive:slots' %}">← Вернуться к списку слотов</a>
         </p>
     </div>
 {% endblock %}
