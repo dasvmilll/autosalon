@@ -13,9 +13,13 @@ def catalog_list(request):
     logger.info(f'catalog_list: открытие каталога, параметры: {dict(request.GET)}')
     cars = CarInStock.objects.filter(status='available').select_related('trim__car_model')
     
+    # Фильтр по бренду ИЛИ VIN (исправление BUG-14)
     brand_query = request.GET.get('brand')
     if brand_query:
-        cars = cars.filter(trim__car_model__brand__icontains=brand_query)
+        cars = cars.filter(
+            Q(trim__car_model__brand__icontains=brand_query) |
+            Q(vin__icontains=brand_query)  # ← ДОБАВЛЕНО: поиск по VIN
+        )
     
     body_query = request.GET.get('body')
     if body_query:
