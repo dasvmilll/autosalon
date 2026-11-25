@@ -41,37 +41,16 @@ class TradeInRequestForm(forms.ModelForm):
         }
 
     def clean_photo(self):
-        """Серверная валидация загружаемого файла."""
         photo = self.cleaned_data.get('photo')
-
-        # ИСПРАВЛЕНИЕ УЯЗВИМОСТИ №2: фото обязательно
-        if not photo:
-            raise ValidationError('Пожалуйста, загрузите фотографию автомобиля.')
-
-        # ИСПРАВЛЕНИЕ УЯЗВИМОСТИ №1 (BUG-16): проверка размера (5 МБ)
-        MAX_SIZE = 5 * 1024 * 1024
-        if photo.size > MAX_SIZE:
-            raise ValidationError(
-                f'Размер файла не должен превышать 5 МБ. '
-                f'Ваш файл: {photo.size / (1024 * 1024):.2f} МБ.'
-            )
-
-        # ИСПРАВЛЕНИЕ УЯЗВИМОСТИ №1: проверка расширения
-        allowed_extensions = ['jpg', 'jpeg', 'png']
-        ext = photo.name.rsplit('.', 1)[-1].lower() if '.' in photo.name else ''
-        if ext not in allowed_extensions:
-            raise ValidationError(
-                f'Разрешены только файлы форматов JPG и PNG. '
-                f'Вы загрузили файл с расширением: .{ext}'
-            )
-
-        # ИСПРАВЛЕНИЕ УЯЗВИМОСТИ №1: проверка MIME-типа (защита от file.php.jpg)
-        content_type = getattr(photo, 'content_type', '')
-        if content_type and content_type not in ['image/jpeg', 'image/png']:
-            raise ValidationError(
-                'Файл не является корректным изображением (проверьте MIME-тип).'
-            )
-
+        if photo:
+            # Проверка размера (5 МБ)
+            if photo.size > 5 * 1024 * 1024:
+                raise ValidationError('Размер файла не должен превышать 5 МБ.')
+            
+            # Проверка формата
+            if photo.content_type not in ['image/jpeg', 'image/png', 'image/jpg']:
+                raise ValidationError('Допустимы только форматы JPG и PNG.')
+        
         return photo
 
 
