@@ -3,19 +3,22 @@
 {% block title %}403 — Доступ запрещён — AutoDrive{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8 text-center">
-            <div class="display-1 fw-bold text-warning mb-3">403</div>
-            <h2 class="mb-4">Доступ запрещён</h2>
-            <p class="lead text-muted mb-4">
-                У вас недостаточно прав для просмотра этой страницы.
-                Войдите в систему под подходящей учётной записью.
-            </p>
-            <div class="d-flex justify-content-center gap-3">
-                <a href="/" class="btn btn-primary btn-lg">На главную</a>
-                <a href="/accounts/login/" class="btn btn-outline-secondary btn-lg">Войти</a>
-            </div>
+<div class="error-page">
+    <div>
+        <div class="error-icon"></div>
+        <div class="error-code code-403">403</div>
+        <h2 class="error-title">Доступ запрещён</h2>
+        <p class="error-message">
+            У вас нет прав для просмотра этой страницы.
+            Возможно, вам нужно войти в систему под другой учётной записью.
+        </p>
+        <div class="d-flex justify-content-center gap-3 flex-wrap">
+            <a href="/" class="btn btn-warning btn-error">
+                 На главную
+            </a>
+            <a href="/accounts/login/" class="btn btn-outline-warning btn-error">
+                 Войти
+            </a>
         </div>
     </div>
 </div>
