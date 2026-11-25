@@ -43,3 +43,12 @@ wheels/
 # OS
 .DS_Store
 Thumbs.db
+
+# Логи
+logs/
+*.log
+
+# Виртуальное окружение
+venv/
+__pycache__/
+*.pyc
