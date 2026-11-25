@@ -3,7 +3,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from .models import User
-
+import re
 
 # ============================================
 # ИСПРАВЛЕНИЕ УЯЗВИМОСТИ №6: Валидатор формата телефона
@@ -62,9 +62,17 @@ class CustomUserCreationForm(UserCreationForm):
 
     # ИСПРАВЛЕНИЕ УЯЗВИМОСТИ №6: серверная валидация телефона
     def clean_phone(self):
-        phone = self.cleaned_data.get('phone', '').replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+        phone = self.cleaned_data.get('phone')
         if phone:
-            phone_validator(phone)  # Вызовет ValidationError, если формат неверный
+            # Убираем все символы кроме цифр и +
+            clean_phone = re.sub(r'[^\d+]', '', phone)
+            
+            # Проверяем формат
+            if not re.match(r'^\+?\d{10,15}$', clean_phone):
+                raise ValidationError('Введите корректный номер телефона (например, +79991234567).')
+            
+            return clean_phone
+        
         return phone
 
     # ИСПРАВЛЕНИЕ УЯЗВИМОСТИ №7: проверка длины имени
