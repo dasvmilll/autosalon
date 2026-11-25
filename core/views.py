@@ -85,7 +85,7 @@ def profile(request):
     elif user.role == 'appraiser':
         stats['tradeins'] = TradeInRequest.objects.filter(appraiser=user).count()
     
-    return render(request, 'profile.html', {
+    return render(request, 'accounts/profile.html', {
         'stats': stats,
         'recent': recent,
     })
@@ -127,3 +127,4 @@ def custom_404(request, exception):
 def custom_500(request):
     """500 — внутренняя ошибка сервера."""
     return render(request, '500.html', status=500)
+

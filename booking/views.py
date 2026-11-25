@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def my_reservations(request):
+    """Список моих броней."""
     reservations = CarReservation.objects.filter(customer=request.user).select_related('car__trim__car_model')
     return render(request, 'booking/my_list.html', {'reservations': reservations})
 
@@ -28,61 +29,75 @@ def reservation_detail(request, pk):
 
 @login_required
 def reservation_create(request):
-    """Создание брони — длительная операция с транзакцией."""
-    logger.info(f'reservation_create: пользователь {request.user.username} начал создание брони')
+    """Создание брони автомобиля."""
     
+    # Если пришли с карточки авто, берем его ID из URL
+    car_id = request.GET.get('car')
+    initial_data = {'car': car_id} if car_id else {}
+
     if request.method == 'POST':
         form = CarReservationForm(request.POST)
         if form.is_valid():
-            car = form.cleaned_data['car']
+            # Создаем объект в памяти, но не сохраняем в БД сразу
+            reservation = form.save(commit=False)
             
-            if CarReservation.objects.filter(car=car, status='active').exists():
-                logger.warning(f'reservation_create: попытка забронировать уже занятую машину VIN={car.vin}')
+            # Привязываем текущего пользователя
+            reservation.customer = request.user
+            
+            # ЯВНАЯ ПРОВЕРКА: если автомобиль не привязался из формы, берем его из GET
+            if not reservation.car and car_id:
+                try:
+                    reservation.car = CarInStock.objects.get(pk=car_id, status='available')
+                except CarInStock.DoesNotExist:
+                    messages.error(request, 'Выбранный автомобиль недоступен для бронирования.')
+                    return render(request, 'booking/create.html', {'form': form})
+            
+            if not reservation.car:
+                messages.error(request, 'Необходимо выбрать автомобиль.')
+                return render(request, 'booking/create.html', {'form': form})
+
+            # Дополнительная проверка: не забронирована ли уже эта машина
+            if CarReservation.objects.filter(car=reservation.car, status='active').exists():
                 messages.error(request, 'Этот автомобиль уже забронирован другим покупателем.')
-                return redirect('booking:create')
-            
-            if car.status != 'available':
-                logger.warning(f'reservation_create: машина VIN={car.vin} недоступна (статус={car.status})')
-                messages.error(request, 'Этот автомобиль уже недоступен.')
-                return redirect('catalog:list')
-            
+                return render(request, 'booking/create.html', {'form': form})
+
             try:
                 with transaction.atomic():
-                    reservation = form.save(commit=False)
-                    reservation.customer = request.user
+                    # 1. Сохраняем саму бронь (теперь car точно не None)
                     reservation.save()
-                    car.status = 'reserved'
-                    car.save(update_fields=['status'])
+                    
+                    # 2. Сохраняем связь ManyToMany (дополнительное оборудование)
+                    equipment = form.cleaned_data.get('equipment')
+                    if equipment:
+                        reservation.equipment.set(equipment)
+                    
+                    # 3. Меняем статус автомобиля на "зарезервирован"
+                    reservation.car.status = 'reserved'
+                    reservation.car.save(update_fields=['status'])
                 
-                logger.info(
-                    f'reservation_create: УСПЕХ — создана бронь #{reservation.pk} '
-                    f'пользователем {request.user.username} на VIN={car.vin}, '
-                    f'задаток={reservation.deposit_amount}₽'
-                )
-                messages.success(request, 'Автомобиль забронирован на 5 дней.')
+                logger.info(f'УСПЕХ: создана бронь #{reservation.pk} пользователем {request.user.username} на авто {reservation.car.vin}')
+                messages.success(request, 'Автомобиль успешно забронирован на 5 дней!')
                 return redirect('booking:my_list')
             
             except Exception as e:
-                logger.error(
-                    f'reservation_create: ОШИБКА при создании брони пользователем '
-                    f'{request.user.username}: {type(e).__name__}: {str(e)}',
-                    exc_info=True
-                )
-                messages.error(request, 'Произошла ошибка при бронировании. Попробуйте позже.')
-                return redirect('booking:create')
+                logger.error(f'ОШИБКА при создании брони: {type(e).__name__}: {str(e)}', exc_info=True)
+                messages.error(request, 'Произошла техническая ошибка при бронировании. Попробуйте позже.')
         else:
-            logger.warning(f'reservation_create: ошибки валидации формы: {form.errors}')
+            logger.warning(f'Ошибки валидации формы бронирования: {form.errors}')
+            messages.error(request, 'Пожалуйста, исправьте ошибки в форме.')
     else:
-        form = CarReservationForm()
+        form = CarReservationForm(initial=initial_data)
+
     return render(request, 'booking/create.html', {'form': form})
 
 
 @login_required
 def export_reservations_csv(request):
+    """Экспорт броней в CSV."""
     logger.info(f'export_reservations_csv: пользователь {request.user.username} экспортировал брони в CSV')
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="reservations.csv"'
-    response.write('\ufeff')
+    response.write('\ufeff') # BOM для корректного открытия в Excel
     writer = csv.writer(response, delimiter=';')
     writer.writerow(['VIN', 'Покупатель', 'Дата создания', 'Действует до', 'Задаток', 'Статус'])
     qs = CarReservation.objects.filter(customer=request.user).select_related('customer', 'car')

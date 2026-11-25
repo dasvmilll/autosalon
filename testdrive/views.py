@@ -3,7 +3,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
-from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from .models import TestDriveSlot, TestDriveBooking
@@ -13,40 +12,52 @@ logger = logging.getLogger(__name__)
 
 
 def slot_list(request):
-    """Список свободных слотов.
-    ИСПРАВЛЕНИЕ BUG-10: исключены слоты с активными записями.
-    """
-    # ИСПРАВЛЕНИЕ BUG-10: исключаем слоты, на которые уже есть активная запись
-    slots = TestDriveSlot.objects.filter(
-        is_blocked=False,
-        start_time__gte=timezone.now()
-    ).exclude(
-        booking__status__in=['created', 'confirmed']  # ← ДОБАВЛЕНО
-    ).order_by('start_time').select_related('test_car', 'manager')
-    
-    logger.info(f'slot_list: найдено {slots.count()} свободных слотов')
-    return render(request, 'testdrive/slots.html', {'slots': slots})
+    """Список свободных слотов."""
+    try:
+        slots = TestDriveSlot.objects.filter(
+            is_blocked=False,
+            start_time__gte=timezone.now()
+        ).exclude(
+            booking__status__in=['created', 'confirmed']
+        ).order_by('start_time').select_related('test_car', 'manager')
+        
+        logger.info(f'slot_list: найдено {slots.count()} свободных слотов')
+        return render(request, 'testdrive/slots.html', {'slots': slots})
+    except Exception as e:
+        logger.error(f'slot_list: ошибка загрузки слотов: {e}', exc_info=True)
+        messages.error(request, 'Ошибка при загрузке расписания.')
+        return render(request, 'testdrive/slots.html', {'slots': []})
 
 
 @login_required
 def my_bookings(request):
     """Мои записи на тест-драйв."""
-    bookings = TestDriveBooking.objects.filter(
-        customer=request.user
-    ).select_related('slot__test_car')
-    return render(request, 'testdrive/my_list.html', {'bookings': bookings})
+    try:
+        bookings = TestDriveBooking.objects.filter(
+            customer=request.user
+        ).select_related('slot__test_car')
+        return render(request, 'testdrive/my_list.html', {'bookings': bookings})
+    except Exception as e:
+        logger.error(f'my_bookings: ошибка загрузки записей: {e}', exc_info=True)
+        messages.error(request, 'Ошибка при загрузке ваших записей.')
+        return render(request, 'testdrive/my_list.html', {'bookings': []})
 
 
 @login_required
 def booking_detail(request, pk):
     """Просмотр конкретной записи (FR-18)."""
-    booking = get_object_or_404(TestDriveBooking, pk=pk, customer=request.user)
-    logger.info(f'booking_detail: пользователь {request.user.username} открыл запись #{pk}')
-    return render(request, 'testdrive/detail.html', {'booking': booking})
+    try:
+        booking = get_object_or_404(TestDriveBooking, pk=pk, customer=request.user)
+        logger.info(f'booking_detail: пользователь {request.user.username} открыл запись #{pk}')
+        return render(request, 'testdrive/detail.html', {'booking': booking})
+    except Exception as e:
+        logger.error(f'booking_detail: ошибка загрузки записи #{pk}: {e}', exc_info=True)
+        messages.error(request, 'Ошибка при загрузке записи.')
+        return redirect('testdrive:my_list')
 
 
 @login_required
-def book_slot(request, pk):
+def book_slot(request, pk):  # ← ИСПРАВЛЕНО: было slot_id, стало pk
     """Запись на выбранный слот тест-драйва."""
     slot = get_object_or_404(TestDriveSlot, pk=pk)
     
@@ -54,20 +65,18 @@ def book_slot(request, pk):
     if slot.is_blocked or slot.start_time < timezone.now():
         messages.error(request, 'Этот слот недоступен для записи.')
         return redirect('testdrive:slots')
-
+        
     if request.method == 'POST':
         form = TestDriveBookingForm(request.POST)
         
-        # ИСПРАВЛЕНИЕ BUG-12: присваиваем значения экземпляру формы ДО вызова is_valid(), 
-        # чтобы метод clean() в models.py мог их безопасно прочитать и проверить пересечения
+        # ИСПРАВЛЕНИЕ BUG-12: присваиваем значения экземпляру формы ДО вызова is_valid()
         form.instance.customer = request.user
         form.instance.slot = slot
         
         if form.is_valid():
             try:
-                # Теперь form.save() сохранит всё корректно, включая связи, и пройдет валидацию модели
+                # Сохраняем запись
                 form.save()
-                
                 logger.info(f'УСПЕХ: пользователь {request.user.username} записался на слот #{slot.pk}')
                 messages.success(request, 'Вы успешно записались на тест-драйв!')
                 return redirect('testdrive:my_list')
@@ -78,7 +87,7 @@ def book_slot(request, pk):
             logger.warning(f'Ошибки валидации формы записи: {form.errors}')
     else:
         form = TestDriveBookingForm()
-
+        
     return render(request, 'testdrive/book.html', {'form': form, 'slot': slot})
 
 @login_required
@@ -98,13 +107,18 @@ def booking_cancel(request, pk):
         )
         return redirect('testdrive:my_list')
 
-    booking.status = 'cancelled'
-    booking.save(update_fields=['status'])
-    logger.info(
-        f'booking_cancel: {request.user.username} отменил запись #{pk} '
-        f'(слот #{booking.slot_id}, авто {booking.slot.test_car.internal_number})'
-    )
-    messages.success(request, 'Запись отменена. Слот снова свободен.')
+    try:
+        booking.status = 'cancelled'
+        booking.save(update_fields=['status'])
+        logger.info(
+            f'booking_cancel: {request.user.username} отменил запись #{pk} '
+            f'(слот #{booking.slot_id}, авто {booking.slot.test_car.internal_number})'
+        )
+        messages.success(request, 'Запись отменена. Слот снова свободен.')
+    except Exception as e:
+        logger.error(f'booking_cancel: ошибка при отмене записи #{pk}: {e}', exc_info=True)
+        messages.error(request, 'Произошла ошибка при отмене записи.')
+        
     return redirect('testdrive:my_list')
 
 
@@ -114,27 +128,34 @@ def booking_status_update(request, pk):
     if request.user.role not in ['manager', 'admin']:
         messages.error(request, 'У вас нет прав.')
         return redirect('core:home')
+        
     booking = get_object_or_404(TestDriveBooking, pk=pk)
     if request.method == 'POST':
         new_status = request.POST.get('status')
         if new_status in dict(TestDriveBooking.STATUS_CHOICES):
-            booking.status = new_status
-            booking.save(update_fields=['status'])
-            if booking.customer.email:
-                send_mail(
-                    'Статус записи на тест-драйв изменён',
-                    f'Ваша запись на {booking.slot.test_car} теперь имеет статус: '
-                    f'{booking.get_status_display()}.',
-                    'noreply@autodrive.ru',
-                    [booking.customer.email],
-                    fail_silently=True,
+            try:
+                booking.status = new_status
+                booking.save(update_fields=['status'])
+                
+                if booking.customer.email:
+                    send_mail(
+                        'Статус записи на тест-драйв изменён',
+                        f'Ваша запись на {booking.slot.test_car} теперь имеет статус: '
+                        f'{booking.get_status_display()}.',
+                        'noreply@autodrive.ru',
+                        [booking.customer.email],
+                        fail_silently=True,
+                    )
+                logger.info(
+                    f'booking_status_update: менеджер {request.user.username} изменил статус '
+                    f'записи #{pk} на "{new_status}"'
                 )
-            logger.info(
-                f'booking_status_update: менеджер {request.user.username} изменил статус '
-                f'записи #{pk} на "{new_status}"'
-            )
-            messages.success(request, f'Статус изменён на «{booking.get_status_display()}».')
-            return redirect('testdrive:manager_list')
+                messages.success(request, f'Статус изменён на «{booking.get_status_display()}».')
+                return redirect('testdrive:manager_list')
+            except Exception as e:
+                logger.error(f'booking_status_update: ошибка изменения статуса #{pk}: {e}', exc_info=True)
+                messages.error(request, 'Произошла ошибка при изменении статуса.')
+                
     return render(request, 'testdrive/status_form.html', {'booking': booking})
 
 
@@ -144,5 +165,10 @@ def manager_bookings(request):
     if request.user.role not in ['manager', 'admin']:
         messages.error(request, 'У вас нет прав.')
         return redirect('core:home')
-    bookings = TestDriveBooking.objects.all().select_related('slot__test_car', 'customer', 'slot__manager')
-    return render(request, 'testdrive/manager_list.html', {'bookings': bookings})
+    try:
+        bookings = TestDriveBooking.objects.all().select_related('slot__test_car', 'customer', 'slot__manager')
+        return render(request, 'testdrive/manager_list.html', {'bookings': bookings})
+    except Exception as e:
+        logger.error(f'manager_bookings: ошибка загрузки списка: {e}', exc_info=True)
+        messages.error(request, 'Ошибка при загрузке списка записей.')
+        return render(request, 'testdrive/manager_list.html', {'bookings': []})
